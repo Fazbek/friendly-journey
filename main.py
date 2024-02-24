@@ -1,85 +1,141 @@
-import sqlite3
 import telebot
-import buttons as bt
-import database as db
-from geopy import Nominatim
+import webbrowser
+from telebot import types
+import sqlite3
+
+bot = telebot.TeleBot("6711204286:AAFBsauhSX3Zkt_IqkKAe6RyzKxUrKo_PRI")
+
+# First exersice
 
 
-bot = telebot.TeleBot('6711204286:AAFBsauhSX3Zkt_IqkKAe6RyzKxUrKo_PRI')
-geolocator = Nominatim(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36')
+@bot.message_handler(commands=["site", "website"])
+def site(message):
+    webbrowser.open("https://youtube.com")
 
 
-@bot.message_handler(commands=['start'])
+@bot.message_handler(commands=["file"])
+def main(message):
+    bot.send_message(message.chat.id, "Hello")
+
+
+@bot.message_handler(commands=["help"])
+def main(message):
+    bot.send_message(message.chat.id, "<b>Help</b> <em>information</em>", parse_mode="html")
+
+
+@bot.message_handler(commands=["hello"])
+def main(message):
+    bot.send_message(message.chat.id, f"Hello, {message.from_user.first_name} {message.from_user.last_name}")
+
+
+@bot.message_handler()
+def info(message):
+    if message.text.lower() == "hello":
+        bot.send_message(message.chat.id, f"Hello, {message.from_user.first_name} {message.from_user.last_name}")
+    elif message.text.lower() == "id":
+        bot.reply_to(message, f"ID: {message.from_user.id}")
+
+
+# Second exersice
+
+@bot.message_handler(commands=["start"])
 def start(message):
-    user_id = message.from_user.id
-    check = db.check_user(user_id)
-    if check:
-        bot.send_message(user_id, 'Добро пожаловать в наш магазин!',
-                         reply_markup=telebot.types.ReplyKeyboardRemove())
-    else:
-        bot.send_message(user_id, 'Здравствуйте! '
-                                  'Давайте проведем регистрацию!\n'
-                                  'Напишите свое имя',
-                         reply_markup=telebot.types.ReplyKeyboardRemove())
-        bot.register_next_step_handler(message, get_name)
+    markup = types.ReplyKeyboardMarkup()
+    btn1 = (types.KeyboardButton("Open this site"))
+    markup.row(btn1)
+    btn2 = (types.KeyboardButton("Delete photo"))
+    btn3 = (types.KeyboardButton("Change text"))
+    markup.row(btn2, btn3)
+    file = open("./photo.jpg", "rb")
+    bot.send_photo(message.chat.id, file, reply_markup=markup)
+    bot.send_message(message.chat.id, "Hello", reply_markup=markup)
+    bot.register_next_step_handler(message, on_click)
 
 
-def get_name(message):
-    user_id = message.from_user.id
-    user_name = message.text
-    bot.send_message(user_id, 'Супер, а теперь отправьте номер!',
-                     reply_markup=bt.num_button())
-    bot.register_next_step_handler(message, get_number, user_name)
+def on_click(message):
+    if message.text == "Open this site":
+        bot.send_message(message.chat.id, "Website is open")
+    elif message.text == "Delete photo":
+        bot.send_message(message.chat.id, "Photo was deleted")
 
 
-def get_number(message, user_name):
-    user_id = message.from_user.id
-    if message.contact:
-        user_number = message.contact.phone_number
-        bot.send_message(user_id, 'А теперь локацию!',
-                         reply_markup=bt.loc_button())
-        bot.register_next_step_handler(message, get_location,
-                                       user_name, user_number)
-    else:
-        bot.send_message(user_id, 'Отправьте номер по кнопке!',
-                         reply_markup=bt.num_button())
-        bot.register_next_step_handler(message, get_number, user_name)
+@bot.message_handler(content_types=["photo"])
+def get_photo(message):
+    markup = types.InlineKeyboardMarkup()
+    btn1 = (types.InlineKeyboardButton("Open this site", url="https://google.com"))
+    markup.row(btn1)
+    btn2 = (types.InlineKeyboardButton("Delete photo", callback_data="delete"))
+    btn3 = (types.InlineKeyboardButton("Change text", callback_data="edit"))
+    markup.row(btn2, btn3)
+    bot.reply_to(message, "This photo is beautiful", reply_markup=markup)
 
 
-def get_location(message, user_name, user_number):
-    user_id = message.from_user.id
-    if message.location:
-        user_location = geolocator.reverse(f'{message.location.latitude}, '
-                                           f'{message.location.longitude}')
-        db.register(user_id, user_name, user_number, str(user_location))
-        bot.send_message(user_id, 'Регистрация прошла упешно!')
-    else:
-        bot.send_message(user_id, 'Отправьте локацию через кнопку!',
-                         reply_markup=bt.loc_button())
-        bot.register_next_step_handler(message, get_location,
-                                       user_name, user_number, greeting, callback)
+@bot.callback_query_handler(func=lambda callback: True)
+def callback_message(callback):
+    if callback.data == "delete":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id - 1)
+    elif callback.data == "edit":
+        bot.edit_message_text("Edit text", callback.message.chat.id, callback.message.message_id)
+
+# Third exersice
 
 
-def greeting(message):
-    bot.send_message(message.from_user.id, f"Привет, {get_name}. 'Регистрация прошла упешно!")
+name = None
+
+
+@bot.message_handler(commands=["data"])
+def data(message):
+    con = sqlite3.connect("main.db")
+    cur = con.cursor()
+
+    cur.execute("CREATE TABLE IF NOT EXISTS users (id int auto_increment primary key, name varchar(50), pass varchar(50));")
+    con.commit()
+    cur.close()
+
+    bot.send_message(message.chat.id, "Hello , i will do registration! Write down your name")
+    bot.register_next_step_handler(message, user_name)
+
+
+def user_name(message):
+    global name
+    name = message.text.strip()
+    bot.send_message(message.chat.id, "Write down the password")
+    bot.register_next_step_handler(message, user_pass)
+
+
+def user_pass(message):
+    password = message.text.strip()
+    con = sqlite3.connect("main.db")
+    cur = con.cursor()
+
+    cur.execute("INSERT INTO users (name, pass) VALUES ('%s', '%s')" % (name, password))
+    con.commit()
+    cur.close()
+    con.close()
+
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.add(telebot.types.InlineKeyboardButton("List of users", callback_data="users"))
+    bot.send_message(message.chat.id, "User has done registration", reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
-    connection = sqlite3.connect("main.db")
-    sql = connection.cursor()
+    con = sqlite3.connect("main.db")
+    cur = con.cursor()
 
-    sql.execute("SELECT * FROM users")
-    users = sql.fetchall()
+    cur.execute("SELECT * FROM users")
+    users = cur.fetchall()
 
     info = ""
     for i in users:
         info += f"Name: {i[1]},  password: {i[2]}\n"
 
-    sql.close()
-    connection.close()
+    cur.close()
+    con.close()
 
     bot.send_message(call.message.chat.id, info)
 
 
-bot.polling()
+bot.polling(non_stop=True)
+
+
