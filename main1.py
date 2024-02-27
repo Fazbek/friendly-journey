@@ -65,7 +65,7 @@ def greeting(message):
 
 
 @bot.callback_query_handler(func=lambda call: True)
-def callback(call):
+def callback(call, message):
     connection = sqlite3.connect("main.db")
     sql = connection.cursor()
 
@@ -74,12 +74,13 @@ def callback(call):
 
     info = ""
     for i in users:
-        info += f"Name: {i[1]},  password: {i[2]}\n"
+        info += f"Name: {i[1]},  number: {i[2]}\n"
 
     sql.close()
     connection.close()
 
     bot.send_message(call.message.chat.id, info)
+    bot.send_message(message.from_user.id, "Data was successfully saved!")
 
 
 bot.polling()
